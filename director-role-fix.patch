@@ -1,0 +1,104 @@
+diff --git a/Bonus.html b/Bonus.html
+index e7b1234..90f5c2d 100644
+--- a/Bonus.html
++++ b/Bonus.html
+@@ -370,6 +370,7 @@
+   <select class="text-lg" id="role">
+     <option value="AM">Account Manager (AM)</option>
+     <option value="BU">Business Unit (BU)</option>
++    <option value="Director">Director</option>
+   </select>
+@@
+-            Standard Monthly RDV Target: <span class="font-bold" id="labelTarget">50</span>
++            Standard Monthly RDV Target: <span class="font-bold" id="labelTarget">50</span>
+@@
+-            F2F Requirement: <span class="font-bold" id="labelF2F">64%</span>
++            F2F Requirement: <span class="font-bold" id="labelF2F">64%</span>
+@@
+-  rdvTarget: 50,
++  rdvTarget: 50,          // default for AM / BU
++  directorTarget: 30,     // target for Directors
+   rdvMinimumPercent: 80,
+-  amF2FPercent: 64,
+-  buF2FPercent: 50,
++  amF2FPercent: 64,
++  buF2FPercent: 50,
++  directorF2FPercent: 50,
+@@
+ function refreshRoleLabels () {
+   const baseT = (appData.role === 'Director')
+     ? appData.constants.directorTarget
+     : appData.constants.rdvTarget;
+   const f2fP = (appData.role === 'AM')
+     ? appData.constants.amF2FPercent
+     : (appData.role === 'BU')
+       ? appData.constants.buF2FPercent
+       : appData.constants.directorF2FPercent;
+   document.getElementById('labelTarget').textContent = baseT;
+   document.getElementById('labelF2F').textContent   = f2fP + '%';
+ }
+@@
+ document.getElementById('role').addEventListener('change', e => {
+   appData.role = e.target.value;
+-  updateRDVTargets();
++  refreshRoleLabels();
++  updateRDVTargets();
+   calculateRDVStatus();
+   calculateBonuses();
+   calculateAdditionalYearlyBonus();
+   updateUI();
+   saveDataToLocalStorage();
+ });
+@@
+ function updateRDVTargets () {
+-  const baseTarget = appData.constants.rdvTarget;
+-  const f2fPercent = (appData.role === 'AM')
+-    ? appData.constants.amF2FPercent
+-    : appData.constants.buF2FPercent;
++  const baseTarget = (appData.role === 'Director')
++    ? appData.constants.directorTarget
++    : appData.constants.rdvTarget;
++  const f2fPercent = (appData.role === 'AM')
++    ? appData.constants.amF2FPercent
++    : (appData.role === 'BU')
++      ? appData.constants.buF2FPercent
++      : appData.constants.directorF2FPercent;
++
++  // update live labels
++  refreshRoleLabels();
+ 
+   for (let i = 0; i < 12; i++) {
+     if (!appData.rdvData[i]) appData.rdvData[i] = {};
+     const daysOff = appData.rdvData[i].daysOff || 0;
+@@
+       appData.rdvData[i].targetF2F = Math.round(adjustedTarget * f2fPercent / 100);
+   }
+ }
+@@
+ function calculateRDVStatus () {
+   for (let i = 0; i < 12; i++) {
+-    const targetRDV = appData.constants.rdvTarget;
++    const targetRDV = (appData.role === 'Director')
++      ? appData.constants.directorTarget
++      : appData.constants.rdvTarget;
+@@
+     const targetF2F = (appData.role === 'AM')
+       ? targetRDV * appData.constants.amF2FPercent / 100
+       : (appData.role === 'BU')
+         ? targetRDV * appData.constants.buF2FPercent / 100
+-        : 0;
++        : targetRDV * appData.constants.directorF2FPercent / 100;
+@@
+     // Bonus Met logic
+     const bonusMet = rdvAchievement >= appData.constants.rdvMinimumPercent &&
+                      f2fAchievement >= 100;
+@@
+   // Update table targets
+   for (let i = 0; i < 12; i++) {
+-    document.getElementById(`targetRDV-${i}`).textContent = appData.constants.rdvTarget;
+-    document.getElementById(`targetF2F-${i}`).textContent = (appData.role === 'AM')
+-      ? Math.round(appData.constants.rdvTarget * appData.constants.amF2FPercent / 100)
+-      : Math.round(appData.constants.rdvTarget * appData.constants.buF2FPercent / 100);
++    document.getElementById(`targetRDV-${i}`).textContent = appData.rdvData[i].targetRDV;
++    document.getElementById(`targetF2F-${i}`).textContent = appData.rdvData[i].targetF2F;
+ }
