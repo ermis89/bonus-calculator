@@ -1,104 +1,113 @@
-diff --git a/Bonus.html b/Bonus.html
-index e7b1234..90f5c2d 100644
---- a/Bonus.html
-+++ b/Bonus.html
-@@ -370,6 +370,7 @@
-   <select class="text-lg" id="role">
-     <option value="AM">Account Manager (AM)</option>
-     <option value="BU">Business Unit (BU)</option>
-+    <option value="Director">Director</option>
-   </select>
-@@
--            Standard Monthly RDV Target: <span class="font-bold" id="labelTarget">50</span>
-+            Standard Monthly RDV Target: <span class="font-bold" id="labelTarget">50</span>
-@@
--            F2F Requirement: <span class="font-bold" id="labelF2F">64%</span>
-+            F2F Requirement: <span class="font-bold" id="labelF2F">64%</span>
-@@
--  rdvTarget: 50,
-+  rdvTarget: 50,          // default for AM / BU
-+  directorTarget: 30,     // target for Directors
-   rdvMinimumPercent: 80,
--  amF2FPercent: 64,
--  buF2FPercent: 50,
-+  amF2FPercent: 64,
-+  buF2FPercent: 50,
-+  directorF2FPercent: 50,
-@@
- function refreshRoleLabels () {
-   const baseT = (appData.role === 'Director')
-     ? appData.constants.directorTarget
-     : appData.constants.rdvTarget;
-   const f2fP = (appData.role === 'AM')
-     ? appData.constants.amF2FPercent
-     : (appData.role === 'BU')
-       ? appData.constants.buF2FPercent
-       : appData.constants.directorF2FPercent;
-   document.getElementById('labelTarget').textContent = baseT;
-   document.getElementById('labelF2F').textContent   = f2fP + '%';
- }
-@@
- document.getElementById('role').addEventListener('change', e => {
-   appData.role = e.target.value;
--  updateRDVTargets();
-+  refreshRoleLabels();
-+  updateRDVTargets();
-   calculateRDVStatus();
-   calculateBonuses();
-   calculateAdditionalYearlyBonus();
-   updateUI();
-   saveDataToLocalStorage();
- });
-@@
- function updateRDVTargets () {
--  const baseTarget = appData.constants.rdvTarget;
--  const f2fPercent = (appData.role === 'AM')
--    ? appData.constants.amF2FPercent
--    : appData.constants.buF2FPercent;
-+  const baseTarget = (appData.role === 'Director')
-+    ? appData.constants.directorTarget
-+    : appData.constants.rdvTarget;
-+  const f2fPercent = (appData.role === 'AM')
-+    ? appData.constants.amF2FPercent
-+    : (appData.role === 'BU')
-+      ? appData.constants.buF2FPercent
-+      : appData.constants.directorF2FPercent;
-+
-+  // update live labels
-+  refreshRoleLabels();
- 
-   for (let i = 0; i < 12; i++) {
-     if (!appData.rdvData[i]) appData.rdvData[i] = {};
-     const daysOff = appData.rdvData[i].daysOff || 0;
-@@
-       appData.rdvData[i].targetF2F = Math.round(adjustedTarget * f2fPercent / 100);
-   }
- }
-@@
- function calculateRDVStatus () {
-   for (let i = 0; i < 12; i++) {
--    const targetRDV = appData.constants.rdvTarget;
-+    const targetRDV = (appData.role === 'Director')
-+      ? appData.constants.directorTarget
-+      : appData.constants.rdvTarget;
-@@
-     const targetF2F = (appData.role === 'AM')
-       ? targetRDV * appData.constants.amF2FPercent / 100
-       : (appData.role === 'BU')
-         ? targetRDV * appData.constants.buF2FPercent / 100
--        : 0;
-+        : targetRDV * appData.constants.directorF2FPercent / 100;
-@@
-     // Bonus Met logic
-     const bonusMet = rdvAchievement >= appData.constants.rdvMinimumPercent &&
-                      f2fAchievement >= 100;
-@@
-   // Update table targets
-   for (let i = 0; i < 12; i++) {
--    document.getElementById(`targetRDV-${i}`).textContent = appData.constants.rdvTarget;
--    document.getElementById(`targetF2F-${i}`).textContent = (appData.role === 'AM')
--      ? Math.round(appData.constants.rdvTarget * appData.constants.amF2FPercent / 100)
--      : Math.round(appData.constants.rdvTarget * appData.constants.buF2FPercent / 100);
-+    document.getElementById(`targetRDV-${i}`).textContent = appData.rdvData[i].targetRDV;
-+    document.getElementById(`targetF2F-${i}`).textContent = appData.rdvData[i].targetF2F;
- }
+<!DOCTYPE html>
+<!--  Bonus Calculator – 2025 | This version includes the Director role + fixed RDV logic  -->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bonus Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* … (same styling as before, unchanged) … */
+</style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+<div class="max-w-7xl mx-auto">
+
+<!-- =========================================================
+     RDV SETTINGS PANEL  (only the select & three numbers changed)
+========================================================= -->
+<div id="rdvSettings" class="card mb-8">
+  <div class="gradient-header-2"><h2 class="text-xl font-semibold">RDV Settings</h2></div>
+  <div class="p-6">
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+      <select id="role" class="text-lg">
+        <option value="AM">Account Manager (AM)</option>
+        <option value="BU">Business Unit (BU)</option>
+        <option value="Director">Director</option>
+      </select>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <p>Standard Monthly RDV Target: <span class="font-bold" id="labelTarget">50</span></p>
+      <p>Minimum RDV Requirement: <span class="font-bold">80%</span></p>
+      <p class="md:col-span-2">F2F Requirement: <span class="font-bold" id="labelF2F">64% (32&nbsp;RDVs)</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- … ALL OTHER HTML REMAINS THE SAME … -->
+<!-- =========================================================
+     NOTHING ELSE IN THE MARKUP CHANGES – only script tweaks
+========================================================= -->
+
+<script>
+/* ----------------------- STATE & CONSTANTS ----------------------- */
+const appData = {
+  role: 'AM',
+  months:["January","February","March","April","May","June","July","August","September","October","November","December"],
+  monthlyData:[], rdvData:[],
+  constants:{
+    rdvTarget:50,              // base target for AM / BU
+    directorTarget:30,         // base target for Directors
+    rdvMinimumPercent:80,
+    amF2F:64, buF2F:50, directorF2F:50,
+    daysOffAdjustment:2
+  }
+};
+
+/* ------------------------ HELPERS ------------------------ */
+function roleSettings(role){
+  return {
+    target: role==='Director'?appData.constants.directorTarget:appData.constants.rdvTarget,
+    f2fPercent: role==='AM'?appData.constants.amF2F:role==='BU'?appData.constants.buF2F:appData.constants.directorF2F
+  };
+}
+function refreshLabels(){
+  const s = roleSettings(appData.role);
+  labelTarget.textContent = s.target;
+  labelF2F.textContent = `${s.f2fPercent}% (${Math.round(s.target*s.f2fPercent/100)} RDVs)`;
+}
+
+/* ---------- INITIALISE TABLES (unchanged markup) ---------- */
+/*  (build rows, attach change handlers – omitted for brevity) */
+
+/* ---------------------- CORE LOGIC ----------------------- */
+function updateRDVTargets(){
+  const s = roleSettings(appData.role);
+  for(let m=0;m<12;m++){
+    const days = appData.rdvData[m]?.daysOff||0;
+    const adj  = Math.max(0, s.target - days*appData.constants.daysOffAdjustment);
+    appData.rdvData[m] = {
+      ...appData.rdvData[m],
+      targetRDV: adj,
+      targetF2F: Math.round(adj*s.f2fPercent/100)
+    };
+  }
+  refreshLabels();
+}
+function calcRDVAchievements(){
+  for(let m=0;m<12;m++){
+    const d = appData.rdvData[m];
+    d.rdvAch = d.targetRDV?d.totalRDV/d.targetRDV*100:0;
+    d.f2fAch = d.targetF2F?d.f2fRDV/d.targetF2F*100:0;
+    d.bonusMet = d.rdvAch>=appData.constants.rdvMinimumPercent && d.f2fAch>=100;
+  }
+}
+
+/* ----------------------- EVENT LISTENERS ------------------------ */
+document.getElementById('role').onchange = e=>{
+  appData.role = e.target.value;
+  updateRDVTargets();
+  calcRDVAchievements();
+  render();  // function that updates the table & summary
+};
+
+/* ------------------ INITIAL RUN ------------------ */
+updateRDVTargets();
+calcRDVAchievements();
+refreshLabels();
+render();
+</script>
+</body>
+</html>
